@@ -52,7 +52,7 @@ The code was left unchanged for the `default` installations.
 
 ## Benchmark Case
 
-As a first benchmark, I measured the performance of `getNetProductionRates` together with the `gri30` reaction mechanism. I ran the function one million times, which takes about 10 s += 0.01 s, and varied the temperature, pressure and mixture composition each time to bypass any internal caching. I then summed up the reaction rates for all species of all one million calls in order to compare the accuracy of this final result between the compilers. The test program can be found here: https://github.com/g3bk47/CanteraCompilerPerformance/blob/main/reactionRates.cpp.
+As a first benchmark, I measured the performance of `getNetProductionRates` together with the `gri30` reaction mechanism. I ran the function one million times, which takes about 10 s +- 0.1 s, and varied the temperature, pressure and mixture composition each time to bypass any internal caching. I then summed up the reaction rates for all species of all one million calls in order to compare the accuracy of this final result between the compilers. The test program can be found here: https://github.com/g3bk47/CanteraCompilerPerformance/blob/main/reactionRates.cpp.
 
 ## Cantera Compilation Times
 
@@ -108,7 +108,7 @@ The relative accuracy differences between the `default` and `fastmath` runs are 
 
 ## Performance
 
-I measured the time it takes to call `getNetProductionRates` with `gri30` one million times (see https://github.com/g3bk47/CanteraCompilerPerformance/blob/main/reactionRates.cpp). I ran each program 100 times. Table 4 shows the mean time over the 100 runs. The standard deviation is between 0.002-0.04 s depending on the compiler and optimization settings.
+I measured the time it takes to call `getNetProductionRates` with `gri30` one million times (see https://github.com/g3bk47/CanteraCompilerPerformance/blob/main/reactionRates.cpp). I ran each program 100 times. Table 4 shows the mean time over the 100 runs. The standard deviation is between 0.04-0.2 s depending on the compiler and optimization settings.
 
 **Table 4. Runtime of one million calls to `getNetProductionRates` with `gri30` in seconds.**
 | compiler | default | fastmath | full |
