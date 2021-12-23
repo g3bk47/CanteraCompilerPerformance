@@ -8,7 +8,7 @@ I therefore set up a benchmark to conduct some accuracy and performance measurem
 ## Setup
 
 I am running my tests on `Red Hat Enterprise Linux 8.2` with `Cantera 2.6.0a3` (80c1e568f91bb0fd5be36f18052050d3d0f6fdc6) from Dec. 17, 2021.
-The machine consits of a two-socket system with 2x Intel(R) Xeon(R) Platinum 8368 CPUs @ 2.40GHz.
+The machine consists of a two-socket system with 2x Intel(R) Xeon(R) Platinum 8368 CPUs @ 2.40GHz.
 
 In the benchmark, I included the following compilers:
 - 4 versions of `g++` (8.5, 9.4, 10.3, 11.1)
