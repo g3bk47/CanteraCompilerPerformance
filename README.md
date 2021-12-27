@@ -2,12 +2,11 @@
 
 ## Introduction
 
-As discussed recently here https://github.com/Cantera/cantera/issues/1155, Cantera cannot be used when compiled with `fast-math` compiler optimizations.
-I therefore set up a benchmark to conduct some accuracy and performance measurements of Cantera using different compilers and optimization settings.
+As discussed recently here https://github.com/Cantera/cantera/issues/1155, Cantera cannot be used when compiled with `fast-math` compiler optimizations due to explicit use of NaNs in its internal logic. I therefore set up a benchmark to conduct some accuracy and performance measurements of Cantera using different compilers and optimization settings.
 
 ## Setup
 
-I am running my tests on `Red Hat Enterprise Linux 8.2` with `Cantera 2.6.0a3` (80c1e568f91bb0fd5be36f18052050d3d0f6fdc6) from Dec. 17, 2021.
+I am running my tests on `Red Hat Enterprise Linux 8.2` with `Cantera 2.6.0a3` (80c1e568f91bb0fd5be36f18052050d3d0f6fdc6 from Dec. 17, 2021).
 The machine consists of a two-socket system with 2x Intel(R) Xeon(R) Platinum 8368 CPUs @ 2.40GHz.
 
 In the benchmark, I included the following compilers:
@@ -16,27 +15,67 @@ In the benchmark, I included the following compilers:
 - 4 versions of `icpx` (21.1, 21.2, 21.3, 21.4)
 - 7 versions of `icpc` (18.0, 19.0, 19.1, 21.1, 21.2, 21.3, 21.4)
 
-I am using three different optimization settings:
+I am using eight different optimization settings:
+- `noOpt`: no optimiztations
+- `O2`: Cantera's default settings, but using O2 instead of O3
+- `strict`: for the Intel compilers, use `strict` instead of `precise` for `fp-model`
 - `default`: Cantera's default optimization settings
+- `fastmathsafe`: like default, but `fast-math` is enabled together with `-fno-finite-math-only`
 - `fastmath`: like default, but `fast-math` is enabled
 - `full`: even more aggressive optimization flags
+- `fullsafe`: like full, but with `-fno-finite-math-only`
 
 In detail, the optimization flags I used look like this (some flags might be redundant, I did not dig through all of the compiler manuals):
 
-**Table 1. Optimization flags.**
-| compiler | default | fastmath | full |
-| :--- | --- | --- | --- |
-| `g++` and `clang++` |	`-O3` |	`-O3 -ffast-math` |	`-fstrict-aliasing -march=native -mtune=native -Ofast -ffast-math` |
-| `icpc` |	`-O3 -fp-model precise ` |	`-O3 -fp-model fast=1` |	`-Ofast -ipo -ansi-alias -no-prec-div -no-prec-sqrt -fp-model fast=2 -fast-transcendentals -xHost` |
-| `icpx` |	`-O3 -fp-model precise` |	`-O3 -fp-model fast -ffast-math` |	`-fp-model fast -Ofast -ffast-math -ansi-alias -xHost -mtune=native -march=native` |
+For the different `gcc/g++` and `clang/clang++` versions, I used:
+
+**Table 2. Optimization flags for `gcc/g++` and `clang/clang++`.**
+| setting | flags |
+| :--- | --- |
+| `noOpt` | `-O0` |
+| `O2` | `-O2` |
+| `strict` | only applies to Intel's compilers |
+| `default` | `-O3` |
+| `fastmathsafe` | `-O3 -ffast-math` |
+| `fastmath` | `-O3 -ffast-math -fno-finite-math-only` |
+| `full` | `-fstrict-aliasing -march=native -mtune=native -Ofast -ffast-math` |
+| `fullsafe` | `-fstrict-aliasing -march=native -mtune=native -Ofast -ffast-math -fno-finite-math-only` |
+
+For the different `icc/icpc` versions, I used:
+
+**Table 3. Optimization flags for `icc/icpc`.**
+| setting | flags |
+| :--- | --- |
+| `noOpt` | `-fp-model strict -O0` |
+| `O2` | `-O2 -fp-model precise` |
+| `strict` | `-O3 -fp-model strict` |
+| `default` | `-O3 -fp-model precise` |
+| `fastmathsafe` | `-O3 -fp-model fast=1 -ffast-math -fno-finite-math-only` |
+| `fastmath` | `-O3 -fp-model fast=1 -ffast-math` |
+| `full` | `-Ofast -ipo -ansi-alias -no-prec-div -no-prec-sqrt -fp-model fast=2 -fast-transcendentals -xHost` |
+| `fullsafe` | `-Ofast -ipo -ansi-alias -no-prec-div -no-prec-sqrt -fp-model fast=2 -fast-transcendentals -xHost -fno-finite-math-only` |
+
+For the different `icc/icpc` versions, I used:
+
+**Table 4. Optimization flags for `icx/icpx`.**
+| setting | flags |
+| :--- | --- |
+| `noOpt` | `-fp-model strict -O0` |
+| `O2` | `-O2 -fp-model precise` |
+| `strict` | `-O3 -fp-model strict` |
+| `default` | `-O3 -fp-model precise` |
+| `fastmathsafe` | `-O3 -fp-model fast -ffast-math -fno-finite-math-only` |
+| `fastmath` | `-O3 -fp-model fast -ffast-math` |
+| `full` | `-fp-model fast -Ofast -ffast-math -ansi-alias -xHost -mtune=native -march=native` |
+| `fullsafe` | `-fp-model fast -Ofast -ffast-math -ansi-alias -xHost -mtune=native -march=native -fno-finite-math-only` |
 
 I compiled Cantera with the following line (omitting some system specific options):
 
 ```
-scons build -j 76 debug=no optimize=yes python_package=minimal system_yamlcpp=n legacy_rate_constants=yes f90_interface=n optimize_flags="[see above]"
+scons build -j 76 debug=no optimize=[noOpt=no,all others=yes] python_package=minimal system_eigen=n system_yamlcpp=n legacy_rate_constants=yes f90_interface=n optimize_flags="[see above]"no_optimize_flags="[see above]"
 ```
 
-All instances of Cantera that are not compiled with `default` options have to be modified. I removed Cantera's handling of NaNs  for all installations with `fastmath` and `full` with a quick and dirty hack:
+All instances of Cantera that are compiled with `fastmath` or `full` options have to be modified. I removed Cantera's internal handling of NaNs for those two cases with the following quick and dirty hack:
 ```
 grep -rl NAN src/ | xargs sed -i 's/ NAN/ -1e300/g'
 grep -rl NAN src/ | xargs sed -i 's/(NAN/(-1e300/g'
@@ -48,17 +87,13 @@ sed -i 's/include <cmath>/include <cmath>\ninline bool nanfinitemath(double x)\{
 grep -rl 'std::numeric_limits<double>::quiet_NaN()' src/ | xargs sed -i 's/std::numeric_limits<double>::quiet_NaN()/-1e300/g'
 grep -rl 'std::numeric_limits<double>::quiet_NaN()' include/ | xargs sed -i 's/std::numeric_limits<double>::quiet_NaN()/-1e300/g'
 ```
-The code was left unchanged for the `default` installations.
-
-## Benchmark Case
-
-As a first benchmark, I measured the performance of `getNetProductionRates` together with the `gri30` reaction mechanism. I ran the function one million times, which takes about 10 s +- 0.1 s, and varied the temperature, pressure and mixture composition each time to bypass any internal caching. I then summed up the reaction rates for all species of all one million calls in order to compare the accuracy of this final result between the compilers. The test program can be found here: https://github.com/g3bk47/CanteraCompilerPerformance/blob/main/reactionRates.cpp.
+Cantera's source code was left unchanged for the `noOpt`, `O2`, `strict`, `default` ,`fastmathsafe` and `fullsafe` installations. Note that it is sufficient to set `-fno-finite-math-only` for all compilers to use Cantera safely, including the Intel compilers independent of the `fp-model`. 
 
 ## Cantera Compilation Times
 
-In the following, I recorded the compile times of the `scons build` line above. I only have a sample size of one for each value, so I don't know what the variance is. `icpc` tends to be a bit slower than the other compilers and `ipo` adds a lot of additonal compile time. In my case, the only external library available on the system was `Eigen`, everything else was compiled as part of `ext/`.
+In the following, I recorded the compile times of the `scons build` line above. I only have a sample size of one for each value, so I don't know what the variance is. `icpc` tends to be a bit slower than the other compilers and `ipo` adds a lot of additonal compile time. All external libraries were installed using scons and thus with the same optimization flags as Cantera itself.
 
-**Table 2. Compilation times in seconds.**
+**Table 5. Cantera compilation times in seconds.**
 | compiler | noOpt | O2 | strict | default | fastmathsafe | fastmath | full | fullsafe |
 | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `g++8.5.0` | 17.24  | 16.84  | n.a. | 17.89  | 17.83  | 17.49  | 18.63  | 18.78  |
@@ -78,16 +113,24 @@ In the following, I recorded the compile times of the `scons build` line above. 
 | `icpc2021.3.0` | 38.50  | 41.67  | 44.74  | 39.22  | 37.90  | 40.70  | 109.01  | 107.93  |
 | `icpc2021.4.0` | 28.44  | 33.94  | 41.33  | 32.38  | 32.65  | 37.39  | 100.15  | 98.81  |
 
+# Benchmark Cases
 
-## Accuracy
+I benchmarked three commin use-cases of Cantera, both for accuracy and computational performance:
+- evaluation of chemical reaction rates
+- time ingetration of zero-dimensional reactors
+- solving one-dimensional freely propagating flames
 
-The sum of the net reaction rates over all species and over all one million calls to `getNetProductionRates` is `-2277551.38719024` (kmol/m3/s), when evaluated with `g++8.5` and `default` settings. The largest deviation to that value occurs for `icpc18` with `full` optimizations with a value of `-2277551.38720698`. Table 3 shows the relative accuracy of all cases compared to `g++8.5` with `default` settings.
+# Evaluation of Chemical Reaction Rates
+
+As a first benchmark, I measured the performance of `getNetProductionRates` together with the `gri30` reaction mechanism. I ran the function one million times, which takes about 10 s +- 0.1 s, and varied the temperature, pressure and mixture composition each time to bypass any internal caching. I then summed up the reaction rates for all species of all one million calls in order to compare the accuracy of this final result between the compilers. The test program can be found here: https://github.com/g3bk47/CanteraCompilerPerformance/blob/main/reactionRates.cpp.
 
 ## Performance
 
-I measured the time it takes to call `getNetProductionRates` with `gri30` one million times (see https://github.com/g3bk47/CanteraCompilerPerformance/blob/main/reactionRates.cpp). I ran each program 100 times. Table 4 shows the mean time over the 100 runs. The standard deviation is between 0.04-0.2 s depending on the compiler and optimization settings.
+I measured the time it takes to call `getNetProductionRates` with `gri30` one million times (see https://github.com/g3bk47/CanteraCompilerPerformance/blob/main/reactionRates.cpp). I ran each program 100 times. Table 4 shows the mean time over the 100 runs.
 
-**Table X. Runtime of one million calls to `getNetProductionRates` with `gri30` in seconds.**
+Enabling `fastmath` increases the performance of `g++` by about 15 % compared to the default. Enabling `fastmath` together with `no-finite-math-only` still increases `g++`'s performance, but only by about 5 %. For the Intel compilers, the different settings yield almost equal runtimes. Only `fp-model strict` yields slighly slower code (1 % slower). In general, the Intel compilers are about 35 % faster at default optimizations flags compared with `g++` still 25 % faster at the most agressive optimization options. Using `fast math no-finite-math-only` instead of `fp-model precise` for the Intel compilers yields slightly faster code (1 %).
+
+**Table 6. Runtime of one million calls to `getNetProductionRates` with `gri30` in seconds.**
 | compiler | noOpt | O2 | strict | default | fastmathsafe | fastmath | full | fullsafe |
 | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `g++8.5.0` | 68.40  | 15.66  | n.a. | 15.15  | 14.26  | 12.85  | 12.39  | 14.06  |
@@ -107,39 +150,44 @@ I measured the time it takes to call `getNetProductionRates` with `gri30` one mi
 | `icpc2021.3.0` | 85.85  | 9.56  | 9.67  | 9.54  | 9.45  | 9.41  | 9.52  | 9.49  |
 | `icpc2021.4.0` | 86.05  | 9.64  | 9.66  | 9.54  | 9.48  | 9.48  | 9.47  | 9.48  |
 
+## Accuracy
 
-**Table X. Relative accuracy `(result(gcc8 default)-result)/result(gcc8 default)`.**
+The sum of the net reaction rates over all species and over all one million calls to `getNetProductionRates` is evaluated. The reference value is taken to be the one of `g++11` with `noOpt` settings. All compilers/version yield the exact (bitwise) same result when compiled with Cantera's default optimization options. Enabling `fastmath` results in differences of O(10^-10 %).
+
+The reference value for the sum of the reaction rates in kmol/m3/s and the largest deviation from it are:
+- `-2277551.336645 (g++11 noOpt)`
+- `-2277551.336662 (largest deviation)`
+
+**Table 7. Relative accuracy of reaction rate evaluation `(|result(g++11 noOpt)-result)/result(g++11 noOpt)|`.**
 | compiler | noOpt | O2 | strict | default | fastmathsafe | fastmath | full | fullsafe |
 | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `g++8.5.0` | 0.00e+00  | 0.00e+00  | n.a. | 0.00e+00  | 7.17e-12  | 7.17e-12  | 7.17e-12  | 7.17e-12  |
-| `g++9.4.0` | 0.00e+00  | 0.00e+00  | n.a. | 0.00e+00  | 7.17e-12  | 7.17e-12  | 7.17e-12  | 7.17e-12  |
-| `g++10.3.0` | 0.00e+00  | 0.00e+00  | n.a. | 0.00e+00  | 7.17e-12  | 7.17e-12  | 7.17e-12  | 7.17e-12  |
-| `g++11.1.0` | 0.00e+00  | 0.00e+00  | n.a. | 0.00e+00  | 7.17e-12  | 7.17e-12  | 7.17e-12  | 7.17e-12  |
-| `clang++12.0.0` | 0.00e+00  | 0.00e+00  | n.a. | 0.00e+00  | 6.44e-12  | 6.45e-12  | 4.43e-12  | 4.43e-12  |
-| `icpx2021.1` | 0.00e+00  | 0.00e+00  | 0.00e+00  | 0.00e+00  | 6.44e-12  | 6.44e-12  | 4.43e-12  | 4.43e-12  |
-| `icpx2021.2.0` | 0.00e+00  | 0.00e+00  | 0.00e+00  | 0.00e+00  | 6.44e-12  | 6.44e-12  | 4.43e-12  | 4.43e-12  |
-| `icpx2021.3.0` | 0.00e+00  | 0.00e+00  | 0.00e+00  | 0.00e+00  | 6.44e-12  | 6.44e-12  | 4.43e-12  | 4.43e-12  |
-| `icpx2021.4.0` | 0.00e+00  | 0.00e+00  | 0.00e+00  | 0.00e+00  | 6.44e-12  | 6.44e-12  | 4.43e-12  | 4.43e-12  |
-| `icpc18.0.5` | 0.00e+00  | 0.00e+00  | 0.00e+00  | 0.00e+00  | 2.50e-12  | 2.50e-12  | 7.17e-12  | 7.21e-12  |
-| `icpc19.0.5` | 0.00e+00  | 0.00e+00  | 0.00e+00  | 0.00e+00  | 2.50e-12  | 2.50e-12  | 7.21e-12  | 7.21e-12  |
-| `icpc19.1.3` | 0.00e+00  | 0.00e+00  | 0.00e+00  | 0.00e+00  | 2.50e-12  | 2.50e-12  | 7.17e-12  | 7.21e-12  |
-| `icpc2021.1` | 0.00e+00  | 0.00e+00  | 0.00e+00  | 0.00e+00  | 2.50e-12  | 2.50e-12  | 7.17e-12  | 7.21e-12  |
-| `icpc2021.2.0` | 0.00e+00  | 0.00e+00  | 0.00e+00  | 0.00e+00  | 2.50e-12  | 2.50e-12  | 7.17e-12  | 7.21e-12  |
-| `icpc2021.3.0` | 0.00e+00  | 0.00e+00  | 0.00e+00  | 0.00e+00  | 2.50e-12  | 2.50e-12  | 7.17e-12  | 7.21e-12  |
-| `icpc2021.4.0` | 0.00e+00  | 0.00e+00  | 0.00e+00  | 0.00e+00  | 2.50e-12  | 2.50e-12  | 7.17e-12  | 7.21e-12  |
+| `g++8.5.0` | 0  | 0  | n.a. | 0  | 7.17e-12  | 7.17e-12  | 7.17e-12  | 7.17e-12  |
+| `g++9.4.0` | 0  | 0  | n.a. | 0  | 7.17e-12  | 7.17e-12  | 7.17e-12  | 7.17e-12  |
+| `g++10.3.0` | 0  | 0  | n.a. | 0  | 7.17e-12  | 7.17e-12  | 7.17e-12  | 7.17e-12  |
+| `g++11.1.0` | 0  | 0  | n.a. | 0  | 7.17e-12  | 7.17e-12  | 7.17e-12  | 7.17e-12  |
+| `clang++12.0.0` | 0  | 0  | n.a. | 0  | 6.44e-12  | 6.45e-12  | 4.43e-12  | 4.43e-12  |
+| `icpx2021.1` | 0  | 0  | 0  | 0  | 6.44e-12  | 6.44e-12  | 4.43e-12  | 4.43e-12  |
+| `icpx2021.2.0` | 0  | 0  | 0  | 0  | 6.44e-12  | 6.44e-12  | 4.43e-12  | 4.43e-12  |
+| `icpx2021.3.0` | 0  | 0  | 0  | 0  | 6.44e-12  | 6.44e-12  | 4.43e-12  | 4.43e-12  |
+| `icpx2021.4.0` | 0  | 0  | 0  | 0  | 6.44e-12  | 6.44e-12  | 4.43e-12  | 4.43e-12  |
+| `icpc18.0.5` | 0  | 0  | 0  | 0  | 2.50e-12  | 2.50e-12  | 7.17e-12  | 7.21e-12  |
+| `icpc19.0.5` | 0  | 0  | 0  | 0  | 2.50e-12  | 2.50e-12  | 7.21e-12  | 7.21e-12  |
+| `icpc19.1.3` | 0  | 0  | 0  | 0  | 2.50e-12  | 2.50e-12  | 7.17e-12  | 7.21e-12  |
+| `icpc2021.1` | 0  | 0  | 0  | 0  | 2.50e-12  | 2.50e-12  | 7.17e-12  | 7.21e-12  |
+| `icpc2021.2.0` | 0  | 0  | 0  | 0  | 2.50e-12  | 2.50e-12  | 7.17e-12  | 7.21e-12  |
+| `icpc2021.3.0` | 0  | 0  | 0  | 0  | 2.50e-12  | 2.50e-12  | 7.17e-12  | 7.21e-12  |
+| `icpc2021.4.0` | 0  | 0  | 0  | 0  | 2.50e-12  | 2.50e-12  | 7.17e-12  | 7.21e-12  |
 
-
-While all `g++` and `clang++` versions yield the same results with the "safe" `default` settings and all Intel compilers yield the same results with `default`, they are slighly different (`-2277551.38719024` for `gcc` and `clang++` vs. `-2277551.38719031` for the Intel compilers). I don't know where this difference comes from exactly. At first I thought that some routines from a library compiled with a `C` compiler might be involed (as the disabling of `fast-math` only occurs for the `C++` Intel compiler in Cantera's build system if I understand it correctly), but I think my code snippet does not involve any external library calls (other than standard math functions, which should be all IEEE conforming in this case).
-
-The relative accuracy differences between the `default` and `fastmath` runs are at O(10^-10 %).
-
-
-
-**In conclusion**: enabling `fastmath` increases the performance of `g++` by about 15 % and for the Intel compilers by less than 5 %. Results with the Intel compiler at `default` settings are about 35 % faster than the ones by g++, and at `fastmath` settings the intel compiler performs 25 % faster. The relative differences in the final results are about O(10^-10 %).
 
 # Zero-dimensional Reactor
 
-**Table X. Runtime of one million calls to `getNetProductionRates` with `gri30` in seconds.**
+The second benchmark case measures the computing time for a one-dimensional auto-ignition case. The reaction mechanism is again `gri30`. A methane/air mixture at T=1200 K undergoes auto-ignition. The time integration of that problem is performed for t=0.325 s. The temperature at that time point is compared to assess the accuracy. For the performance evaluation, eahc program is ran one thousand times. The code for the benchmark case can be found here: https://github.com/g3bk47/CanteraCompilerPerformance/blob/main/zeroD.cpp
+
+## Performance
+
+Below is the time required to integrate the reactor equation over t=0.325 s. Similar to the first benchmark, enabling `fastmath` speeds up the `g++` code by 11 %. Enabling `fastmath` but with `no-finite-math-only` only increases performance by about 5 %. Again, the different options almost do not affect the timings of the (newer) Intel compilers, which are about 25 % faster than `g++/clang++` at default settings and 15 % faster at full optimization settings. In this case, compiling with `O2` with `g++` is about 8 % slower than compiling with `O3`. Using `fast math no-finite-math-only` instead of `fp-model precise` for the Intel compilers yields slightly faster code (<1 %).
+
+**Table 8. Runtime for 0D reactor integration in seconds.**
 | compiler | noOpt | O2 | strict | default | fastmathsafe | fastmath | full | fullsafe |
 | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `g++8.5.0` | 1.844  | 0.378  | n.a. | 0.344  | 0.318  | 0.292  | 0.288  | 0.319  |
@@ -159,15 +207,22 @@ The relative accuracy differences between the `default` and `fastmath` runs are 
 | `icpc2021.3.0` | 2.374  | 0.253  | 0.256  | 0.253  | 0.248  | 0.250  | 0.231  | 0.237  |
 | `icpc2021.4.0` | 2.373  | 0.252  | 0.256  | 0.254  | 0.248  | 0.247  | 0.230  | 0.237  |
 
+## Accuracy
 
-**Table X. Relative accuracy `(result(gcc8 default)-result)/result(gcc8 default)`.**
+The temperature at t=0.325 s is evaluated. The reference temperature in K from `g++11 noOpt` and the temperature that deviates most from that value among all compilers are:
+- `2150.5660919129 (g++11 noOpt)`
+- `2150.5660919159 (largest deviation)`
+
+In this case, the results are not the same bitwise between `g++/clang++` and the Intel compilers. Again, the deviations are within O(10^-10 %).
+
+**Table 9. Relative accuracy of 0D reactor integration `(|result(g++11 noOpt)-result)/result(g++11 noOpt)|`.**
 | compiler | noOpt | O2 | strict | default | fastmathsafe | fastmath | full | fullsafe |
 | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `g++8.5.0` | 0.00e+00  | 0.00e+00  | n.a. | 0.00e+00  | 1.01e-13  | 1.01e-13  | 1.87e-13  | 1.87e-13  |
-| `g++9.4.0` | 0.00e+00  | 0.00e+00  | n.a. | 0.00e+00  | 1.32e-12  | 1.32e-12  | 8.22e-13  | 8.22e-13  |
-| `g++10.3.0` | 0.00e+00  | 0.00e+00  | n.a. | 0.00e+00  | 1.32e-12  | 1.32e-12  | 1.42e-12  | 1.42e-12  |
-| `g++11.1.0` | 0.00e+00  | 0.00e+00  | n.a. | 0.00e+00  | 1.32e-12  | 1.32e-12  | 7.82e-13  | 7.82e-13  |
-| `clang++12.0.0` | 0.00e+00  | 0.00e+00  | n.a. | 0.00e+00  | 5.43e-13  | 8.71e-13  | 1.54e-12  | 8.07e-13  |
+| `g++8.5.0` | 0  | 0  | n.a. | 0  | 1.01e-13  | 1.01e-13  | 1.87e-13  | 1.87e-13  |
+| `g++9.4.0` | 0  | 0  | n.a. | 0  | 1.32e-12  | 1.32e-12  | 8.22e-13  | 8.22e-13  |
+| `g++10.3.0` | 0  | 0  | n.a. | 0  | 1.32e-12  | 1.32e-12  | 1.42e-12  | 1.42e-12  |
+| `g++11.1.0` | 0  | 0  | n.a. | 0  | 1.32e-12  | 1.32e-12  | 7.82e-13  | 7.82e-13  |
+| `clang++12.0.0` | 0  | 0  | n.a. | 0  | 5.43e-13  | 8.71e-13  | 1.54e-12  | 8.07e-13  |
 | `icpx2021.1` | 8.90e-13  | 8.90e-13  | 8.90e-13  | 8.90e-13  | 4.38e-13  | 6.69e-13  | 3.14e-13  | 9.32e-13  |
 | `icpx2021.2.0` | 8.90e-13  | 8.90e-13  | 8.90e-13  | 8.90e-13  | 4.54e-13  | 9.72e-13  | 3.31e-13  | 1.01e-12  |
 | `icpx2021.3.0` | 8.90e-13  | 8.90e-13  | 8.90e-13  | 8.90e-13  | 4.54e-13  | 9.72e-13  | 3.31e-13  | 1.01e-12  |
@@ -182,7 +237,13 @@ The relative accuracy differences between the `default` and `fastmath` runs are 
 
 # One-dimensional freely propagating flame (coarse)
 
-**Table X. Runtime of one million calls to `getNetProductionRates` with `gri30` in seconds.**
+The third benchmark is a freely propagating H2/O2 flame at atmospheric conditions. This case is denoted as "coarse" (`slope` and `curve` =  0.001). Times are measured and averaged over ten runs. To compare the accuracy, the flame speed (taken as the velocity at the first domain point) is evaluated. The code of this case can be found here: https://github.com/g3bk47/CanteraCompilerPerformance/blob/main/oneD.cpp
+
+## Performance
+
+Below is the time required to solve the 1D problem. Enabling `fastmath` speeds up the `g++` code by only 3 %. Enabling `fastmath` but with `no-finite-math-only` increases performance by about 0.5 %. Again, the different options almost do not affect the timings of the (newer) Intel compilers, which are about 8 % faster than `g++/clang++` at default settings and 7 % faster at full optimization settings. Using `fast math no-finite-math-only` instead of `fp-model precise` for the Intel compilers yields slightly faster code (<1 %).
+
+**Table 11. Runtime for solving a (coarse) 1D flame in seconds.**
 | compiler | noOpt | O2 | strict | default | fastmathsafe | fastmath | full | fullsafe |
 | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `g++8.5.0` | 119.24  | 16.57  | n.a. | 9.39  | 9.24  | 9.03  | 8.92  | 9.36  |
@@ -202,15 +263,22 @@ The relative accuracy differences between the `default` and `fastmath` runs are 
 | `icpc2021.3.0` | 116.15  | 8.51  | 8.71  | 8.48  | 8.56  | 8.51  | 8.15  | 8.19  |
 | `icpc2021.4.0` | 129.17  | 8.46  | 8.67  | 8.56  | 8.46  | 8.46  | 8.15  | 8.21  |
 
+## Accuracy
 
-**Table X. Relative accuracy `(result(gcc8 default)-result)/result(gcc8 default)`.**
+The flame speed is evaluated. The reference flame speed in m/s from `g++11 noOpt` and the flame speed that deviates most from that value among all compilers are:
+- `10.14616550 (g++11 noOpt)`
+- `10.14616549 (largest deviation)`
+
+Again, the results are not the same bitwise between `g++/clang++` and the Intel compilers. The deviations are within O(10^-7 %). Note that the only compiler that yields different results at default settings than all other compilers is `icpc18.0.5`.
+
+**Table 12. Relative accuracy for solving a (coarse) 1D flame `(|result(g++11 noOpt)-result)/result(g++11 noOpt)|`.**
 | compiler | noOpt | O2 | strict | default | fastmathsafe | fastmath | full | fullsafe |
 | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `g++8.5.0` | 0.00e+00  | 0.00e+00  | n.a. | 0.00e+00  | 3.10e-09  | 3.10e-09  | 2.71e-09  | 2.71e-09  |
-| `g++9.4.0` | 0.00e+00  | 0.00e+00  | n.a. | 0.00e+00  | 3.10e-09  | 3.10e-09  | 3.16e-09  | 3.16e-09  |
-| `g++10.3.0` | 0.00e+00  | 0.00e+00  | n.a. | 0.00e+00  | 3.10e-09  | 3.10e-09  | 2.57e-09  | 2.57e-09  |
-| `g++11.1.0` | 0.00e+00  | 0.00e+00  | n.a. | 0.00e+00  | 3.30e-09  | 3.30e-09  | 3.09e-09  | 3.09e-09  |
-| `clang++12.0.0` | 0.00e+00  | 0.00e+00  | n.a. | 0.00e+00  | 2.90e-09  | 3.25e-09  | 3.36e-09  | 2.96e-09  |
+| `g++8.5.0` | 0  | 0  | n.a. | 0  | 3.10e-09  | 3.10e-09  | 2.71e-09  | 2.71e-09  |
+| `g++9.4.0` | 0  | 0  | n.a. | 0 | 3.10e-09  | 3.10e-09  | 3.16e-09  | 3.16e-09  |
+| `g++10.3.0` | 0  | 0  | n.a. | 0  | 3.10e-09  | 3.10e-09  | 2.57e-09  | 2.57e-09  |
+| `g++11.1.0` | 0  | 0  | n.a. | 0  | 3.30e-09  | 3.30e-09  | 3.09e-09  | 3.09e-09  |
+| `clang++12.0.0` | 0 | 0  | n.a. | 0  | 2.90e-09  | 3.25e-09  | 3.36e-09  | 2.96e-09  |
 | `icpx2021.1` | 6.86e-10  | 6.86e-10  | 6.86e-10  | 6.86e-10  | 2.81e-09  | 2.93e-09  | 3.75e-09  | 2.94e-09  |
 | `icpx2021.2.0` | 6.86e-10  | 6.86e-10  | 6.86e-10  | 6.86e-10  | 3.67e-09  | 3.36e-09  | 3.48e-09  | 2.54e-09  |
 | `icpx2021.3.0` | 6.86e-10  | 6.86e-10  | 6.86e-10  | 6.86e-10  | 3.67e-09  | 3.36e-09  | 3.48e-09  | 2.54e-09  |
@@ -225,7 +293,13 @@ The relative accuracy differences between the `default` and `fastmath` runs are 
 
 # One-dimensional freely propagating flame (fine)
 
-**Table X. Runtime of one million calls to `getNetProductionRates` with `gri30` in seconds.**
+The last benchmark case is the same 1D flame from before, but with ten times lower refinement settings (`slope` and `curve` =  0.0001, https://github.com/g3bk47/CanteraCompilerPerformance/blob/main/oneD.cpp). Each simulation is ran once.
+
+## Performance
+
+This case converges in 10 to 20 minutes at default optimization flags. Enabling `fastmath`, however, can increase simulation times tenfold. This behavior is very much dependent on the compiler/version. There are even cases where simulations with `fastmath` find a solution, but with `fastmath no-finite-math-only` I had to cancel the simulation after 36 hours. Therefore, neither `fastmath` nor `fastmath no-finite-math-only` should be used in the defaults.
+
+**Table 13. Runtime for solving a (fine) 1D flame in hours.**
 | compiler | noOpt | O2 | strict | default | fastmathsafe | fastmath | full | fullsafe |
 | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `g++8.5.0` | 1.64  | 0.22  | n.a. | 0.17  | 0.44  | 0.46  | 0.77  | 0.76  |
@@ -245,16 +319,18 @@ The relative accuracy differences between the `default` and `fastmath` runs are 
 | `icpc2021.3.0` | 2.43  | 0.33  | 0.33  | 0.31  | 13.18  | 14.89  | 0.93  | 0.94  |
 | `icpc2021.4.0` | 3.04  | 0.36  | 0.34  | 0.34  | 14.71  | 13.37  | 0.83  | 0.81  |
 
+## Accuracy
 
+Although the flame speed should converge more closely beteween the different compilers/versions due to the finer mesh, results differ by up to 0.001 %, much more than in the previous case. Again, `icpc18.0.5` produces different results compared with all other Intel compilers at default optimization settings.
 
-**Table X. Relative accuracy `(result(gcc8 default)-result)/result(gcc8 default)`.**
+**Table 14. Relative accuracy for solving a (fine) 1D flame `(|result(g++11 noOpt)-result)/result(g++11 noOpt)|`.**
 | compiler | noOpt | O2 | strict | default | fastmathsafe | fastmath | full | fullsafe |
 | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `g++8.5.0` | 0.00e+00  | 0.00e+00  | n.a. | 0.00e+00  | 3.24e-05  | 3.24e-05  | 4.43e-06  | 4.43e-06  |
-| `g++9.4.0` | 0.00e+00  | 0.00e+00  | n.a. | 0.00e+00  | 3.24e-05  | 3.24e-05  | 2.66e-05  | 2.66e-05  |
-| `g++10.3.0` | 0.00e+00  | 0.00e+00  | n.a. | 0.00e+00  | 3.24e-05  | 3.24e-05  | 5.79e-06  | 5.79e-06  |
-| `g++11.1.0` | 0.00e+00  | 0.00e+00  | n.a. | 0.00e+00  | 2.04e-05  | 2.04e-05  | 6.47e-06  | 6.47e-06  |
-| `clang++12.0.0` | 0.00e+00  | 0.00e+00  | n.a. | 0.00e+00  | 3.82e-06  | 2.78e-05  | 2.57e-04  | 1.02e-04  |
+| `g++8.5.0` | 0  | 0  | n.a. | 0  | 3.24e-05  | 3.24e-05  | 4.43e-06  | 4.43e-06  |
+| `g++9.4.0` | 0  | 0  | n.a. | 0  | 3.24e-05  | 3.24e-05  | 2.66e-05  | 2.66e-05  |
+| `g++10.3.0` | 0  | 0  | n.a. | 0  | 3.24e-05  | 3.24e-05  | 5.79e-06  | 5.79e-06  |
+| `g++11.1.0` | 0  | 0  | n.a. | 0  | 2.04e-05  | 2.04e-05  | 6.47e-06  | 6.47e-06  |
+| `clang++12.0.0` | 0  | 0  | n.a. | 0  | 3.82e-06  | 2.78e-05  | 2.57e-04  | 1.02e-04  |
 | `icpx2021.1` | 2.07e-05  | 2.07e-05  | 2.07e-05  | 2.07e-05  | 4.20e-06  | 1.77e-05  | 3.17e-06  | 1.15e-05  |
 | `icpx2021.2.0` | 2.07e-05  | 2.07e-05  | 2.07e-05  | 2.07e-05  | ??  | 3.89e-05  | 3.17e-05  | 2.53e-05  |
 | `icpx2021.3.0` | 2.07e-05  | 2.07e-05  | 2.07e-05  | 2.07e-05  | ??  | 3.89e-05  | 3.17e-05  | 2.53e-05  |
@@ -266,3 +342,19 @@ The relative accuracy differences between the `default` and `fastmath` runs are 
 | `icpc2021.2.0` | 2.07e-05  | 2.07e-05  | 2.07e-05  | 2.07e-05  | 3.29e-05  | 3.29e-05  | 1.49e-05  | 1.49e-05  |
 | `icpc2021.3.0` | 2.07e-05  | 2.07e-05  | 2.07e-05  | 2.07e-05  | 3.29e-05  | 3.29e-05  | 1.49e-05  | 1.49e-05  |
 | `icpc2021.4.0` | 2.07e-05  | 2.07e-05  | 2.07e-05  | 2.07e-05  | 3.29e-05  | 3.29e-05  | 1.49e-05  | 1.49e-05  |
+
+# Conclusions
+
+I ran different sample programs (evaluation of reaction rates, 0D auto-ignition and 1D flame) with 16 different compilers/versions and 8 different optimization settings. The findings are summarized as follows:
+
+- Even at the strictest settings, Intel compilers and `g++/clang++` do not yield the same results (bitwise) in general.
+- For simpler cases, differences in results are within O(10^-7 %).
+- For `g++`, `O2` generates slightly slower code compared to `O3` but without affecting the results.
+- In many cases, using `fastmath` increases performance by 10 % to 15 % for `g++`. Using ` fastmath` together with `no-finite-math-only` increases performance by only 5 %. However, both options can drastically deteriorate convergence behavior.
+- For the Intel compiler, `fp-model strict` is slighly slower than `fp-model precise` but the accuracy was the same in all test cases. `fastmath` together with `no-finite-math-only` produces slighly faster code and can be used together with Cantera, however, convergence might deteriorate drastically. In general, the difference between compiler settings have much less effect for the Intel compilers than for `g++/clang++`.
+
+From my tests above, the current defaults of Cantera seem to be the optimal compromise between performance and safety:
+- `O3` for `g++/clang++`
+- `O3 -fp-model precise` for the Intel compilers
+
+Since `fastmath` **without** `no-finite-math-only` can significantly improve the performance of `g++` for simple cases like the evaluation of reaction rates, it would be nice for Cantera to be compatible with this option, e.g. when users couple Cantera to other CFD codes, which means removing the internal use of NaNs.
