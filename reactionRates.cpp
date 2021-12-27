@@ -17,7 +17,7 @@ int main ()
 
     double Tu = 300.0;
     double pressure = 101325.0;
-    // mass fraction in unburnt CH4/air mixture at an equivalence ratio of unity
+    // mass fractions in unburnt CH4/air mixture at an equivalence ratio of unity
     double Yu[] =   {0, 0, 0, 0.22006045163353515903, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.05516641392519539, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.72477313444126933994, 0, 0, 0, 0, 0};
 
@@ -51,7 +51,7 @@ int main ()
         gas.setState_TP(T,pressure);
         gas.setMassFractions_NoNorm(Y.data());
 
-        kin.getNetProductionRates(RR.data()); // this is the function that is effectively being times
+        kin.getNetProductionRates(RR.data()); // this is the function that is effectively being timed
 
         for (std::size_t k = 0; k != nSpecies; ++k)
             sum += RR[k]; // sum up all reaction rates over all species and all one million conditions
