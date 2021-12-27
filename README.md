@@ -345,7 +345,7 @@ Although the flame speed should converge more closely beteween the different com
 
 # Conclusions
 
-I ran different sample programs (evaluation of reaction rates, 0D auto-ignition and 1D flame) with 16 different compilers/versions and 8 different optimization settings. The findings are summarized as follows:
+I ran different sample programs (evaluation of reaction rates, 0D reactor and 1D flame) with 16 different compilers/versions and 8 different optimization settings. The findings are summarized as follows:
 
 - Even at the strictest settings, Intel compilers and `g++/clang++` do not yield the same results (bitwise) in general.
 - For simpler cases, differences in results are within O(10^-7 %).
@@ -357,4 +357,4 @@ From my tests above, the current defaults of Cantera seem to be the optimal comp
 - `O3` for `g++/clang++`
 - `O3 -fp-model precise` for the Intel compilers
 
-Since `fastmath` **without** `no-finite-math-only` can significantly improve the performance of `g++` for simple cases like the evaluation of reaction rates, it would be nice for Cantera to be compatible with this option, e.g. when users couple Cantera to other CFD codes, which means removing the internal use of NaNs.
+Since `fastmath` **without** `no-finite-math-only` can significantly improve the performance of `g++` for simple cases like the evaluation of reaction rates, it would be nice for Cantera to be compatible with this option, e.g. for users coupling Cantera to other CFD codes, which means the internal use of NaNs and Infs would have to be removed.
