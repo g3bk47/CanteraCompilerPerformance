@@ -55,7 +55,7 @@ For the different `icc/icpc` versions, I used:
 | `full` | `-Ofast -ipo -ansi-alias -no-prec-div -no-prec-sqrt -fp-model fast=2 -fast-transcendentals -xHost` |
 | `fullsafe` | `-Ofast -ipo -ansi-alias -no-prec-div -no-prec-sqrt -fp-model fast=2 -fast-transcendentals -xHost -fno-finite-math-only` |
 
-For the different `icc/icpc` versions, I used:
+For the different `icx/icpx` versions, I used:
 
 **Table 4. Optimization flags for `icx/icpx`.**
 | setting | flags |
