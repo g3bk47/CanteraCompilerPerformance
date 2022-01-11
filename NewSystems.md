@@ -2,11 +2,11 @@
 
 ## 1) Performance of reaction rate calculation
 
-Mean runtime for over 20 runs for reaction rate calculation from https://github.com/g3bk47/CanteraCompilerPerformance/blob/main/reactionRates.cpp]. For a description of the compile flags, see [https://github.com/g3bk47/CanteraCompilerPerformance/blob/main/README.md]
+Mean runtime over 20 runs for the reaction rate calculations from https://github.com/g3bk47/CanteraCompilerPerformance/blob/main/reactionRates.cpp]. For a detailed description of the compile flags, see [https://github.com/g3bk47/CanteraCompilerPerformance/blob/main/README.md]
 
 ### System 1: Intel Xeon E5-2660 v4 (Broadwell)
 
-**Table 1. Runtime in seconds for calculatin reaction rates on Intel Xeon E5-2660 v4.**
+**Table 1. Runtime in seconds for calculating reaction rates on Intel Xeon E5-2660 v4.**
 | compiler | noOpt | O2 | strict | default | fastmathsafe | fastmath | full | fullsafe |
 | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `g++8` | 85.91  | 20.79  | n.a. | 20.33  | 19.71  | 17.23  | 16.80  | 19.21  |
@@ -27,7 +27,7 @@ Mean runtime for over 20 runs for reaction rate calculation from https://github.
 
 ### System 2: Intel Xeon Gold 6230 (Cascade Lake)
 
-**Table 2. Runtime in seconds for calculatin reaction rates on Intel Xeon Gold 6230.**
+**Table 2. Runtime in seconds for calculating reaction rates on Intel Xeon Gold 6230.**
 | compiler | noOpt | O2 | strict | default | fastmathsafe | fastmath | full | fullsafe |
 | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `g++8` | 67.29  | 15.73  | n.a. | 15.74  | 15.03  | 13.06  | 12.58  | 14.49  |
@@ -48,7 +48,7 @@ Mean runtime for over 20 runs for reaction rate calculation from https://github.
 
 ## 2) Profiling
 
-All results shown in this section have been obtained on the Intel Xeon E5-2660 v4 system, measurements are done with `perf`
+All results shown in this section have been obtained on the Intel Xeon E5-2660 v4 system. Measurements are done with `perf`.
 
 ### gcc with fastmath vs. fasthmath + nofinitemath
 
@@ -57,12 +57,12 @@ The image below shows profiling of the reaction rate calculation with `gcc 10.3`
 **Figure 1: `gcc 10.3` and `O3+fastmath`**
 ![pic](https://github.com/g3bk47/CanteraCompilerPerformance/blob/main/gcc_fastmath.png?raw=true)
 
-The next image shows the profiling with `gcc 10.3` and `O3+fastmath+nofinitemath`. In addition to the calls to `__ieee754_exp_fma`, 12% of the runtime are spent on calling `__GI___exp`, which seems to be a version of `exp` with additional error handling.
+The next image shows the profiling with `gcc 10.3` and `O3+fastmath+nofinitemath`. In addition to the calls to `__ieee754_exp_fma`, 12% of the runtime are spent on calling `__GI___exp`, which seems to be a version of `exp` with additional error handling. Interestingly, `log10_finite` appears here as well.
 
 **Figure 2: `gcc 10.3` and `O3+fastmath+nofinitemath`**
 ![pic](https://github.com/g3bk47/CanteraCompilerPerformance/blob/main/gcc_nofinitemath.png?raw=true)
 
-Interestingly, both programs yield the exact same bitwise results, but a performance gain of >10% can be observed when using `fastmath` without `nofinitemath`.
+Both programs yield the exact same bitwise results, but a performance gain of >10% can be observed when using `fastmath` without `nofinitemath`.
 
 ### Intel vs. gcc
 
