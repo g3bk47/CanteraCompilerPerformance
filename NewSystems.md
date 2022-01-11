@@ -52,14 +52,23 @@ All results shown in this section have been obtained on the Intel Xeon E5-2660 v
 
 ### gcc with fastmath vs. fasthmath + nofinitemath
 
-The image below shows profiling of the reaction rate calculation with `gcc 10.3` and `O3+fastmath`. About 38% of the total runtime is spent on calling `__ieee754_exp_fma`. Additionally, special versions of other functions (`log10_finite` and `exp_finite`) appear as well.
+The image below shows profiling of the reaction rate calculation with `gcc 10.3` and `O3+fastmath`. About 39% of the total runtime is spent on calling `__ieee754_exp_fma`. Additionally, special versions of other functions (`log10_finite` and `exp_finite`) appear as well.
 
-**Figure 1: `gcc 10.3` and `O3+fastmath`
+**Figure 1: `gcc 10.3` and `O3+fastmath`**
 ![pic](https://github.com/g3bk47/CanteraCompilerPerformance/blob/main/gcc_fastmath.png?raw=true)
 
 The next image shows the profiling with `gcc 10.3` and `O3+fastmath+nofinitemath`. In addition to the calls to `__ieee754_exp_fma`, 12% of the runtime are spent on calling `__GI___exp`, which seems to be a version of `exp` with additional error handling.
 
-**Figure 2: `gcc 10.3` and `O3+fastmath+nofinitemath`
+**Figure 2: `gcc 10.3` and `O3+fastmath+nofinitemath`**
 ![pic](https://github.com/g3bk47/CanteraCompilerPerformance/blob/main/gcc_nofinitemath.png?raw=true)
 
+Interestingly, both programs yield the exact same bitwise results, but a performance gain of >10% can be observed when using `fastmath` without `nofinitemath`.
+
 ### Intel vs. gcc
+
+The Intel compiler finds more opportunities to optimize. For example, the picture below is the generated assembly for `updateTemp` from https://github.com/Cantera/cantera/blob/ad213c45a39eb0ba39b2f4e418518371d822cc11/src/kinetics/Falloff.cpp#L184-L188. 
+
+**Figure 3: Optizations done by the Intel compiler**
+![pic](https://github.com/g3bk47/CanteraCompilerPerformance/blob/main/4_annotated.png?raw=true)
+
+The two calls to the exponential function at the beginning are merged into a single call of a vectorized version of that function. Interestingly, pretty much the same assembly is generated for `O3`, `O3+fp-model fast+fastmath` and `O3+fp-model fast+fastmath+nofinitemath`. Gcc and clang, on the other hand, always generate machine code with three exponential function calls. See also here for a direct comparison: https://godbolt.org/z/zMhaEPdYM
