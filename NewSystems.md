@@ -64,11 +64,16 @@ The next image shows the profiling with `gcc 10.3` and `O3+fastmath+nofinitemath
 
 Both programs yield the exact same bitwise results, but a performance gain of >10% can be observed when using `fastmath` without `nofinitemath`.
 
+For completeness, here are the profiling results for `icxp`:
+
+**Figure 3: `icxp 21.4` and `O3+fp-model fast+fastmath`**
+![pic](https://github.com/g3bk47/CanteraCompilerPerformance/blob/main/icx_fastmath.png?raw=true)
+
 ### Intel vs. gcc
 
 The Intel compiler finds more opportunities to optimize. For example, the picture below is the generated assembly for `updateTemp` from https://github.com/Cantera/cantera/blob/ad213c45a39eb0ba39b2f4e418518371d822cc11/src/kinetics/Falloff.cpp#L184-L188. 
 
-**Figure 3: Optizations done by the Intel compiler**
+**Figure 4: Optizations done by the Intel compiler**
 ![pic](https://github.com/g3bk47/CanteraCompilerPerformance/blob/main/4_annotated.png?raw=true)
 
 The two calls to the exponential function at the beginning are merged into a single call of a vectorized version of that function. Interestingly, pretty much the same assembly is generated for `O3`, `O3+fp-model fast+fastmath` and `O3+fp-model fast+fastmath+nofinitemath`. Gcc and clang, on the other hand, always generate machine code with three exponential function calls. See also here for a direct comparison: https://godbolt.org/z/zMhaEPdYM
