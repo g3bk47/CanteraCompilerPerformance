@@ -2,7 +2,7 @@
 
 ## 1) Performance of reaction rate calculation
 
-Mean runtime for over 20 runs for reaction rate calculation from [??]. For a description of the compile flags, see [??]
+Mean runtime for over 20 runs for reaction rate calculation from https://github.com/g3bk47/CanteraCompilerPerformance/blob/main/reactionRates.cpp]. For a description of the compile flags, see [https://github.com/g3bk47/CanteraCompilerPerformance/blob/main/README.md]
 
 ### System 1: Intel Xeon E5-2660 v4 (Broadwell)
 
