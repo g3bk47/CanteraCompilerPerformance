@@ -1,6 +1,6 @@
 # CanteraCompilerPerformance on two additional systems
 
-## Performance of reaction rate calculation
+## 1) Performance of reaction rate calculation
 
 Mean runtime for over 20 runs for reaction rate calculation from [??]. For a description of the compile flags, see [??]
 
@@ -46,6 +46,20 @@ Mean runtime for over 20 runs for reaction rate calculation from [??]. For a des
 | `icpc19.1` | 82.53  | 9.51  | 9.53  | 9.48  | 9.57  | 9.63  | 9.26  | 9.38  |
 | `icpc21.4` | 83.01  | 9.48  | 9.54  | 9.34  | 9.48  | 9.62  | 9.40  | 9.34  |
 
-## Profiling
+## 2) Profiling
 
-All results shown in this section have been obtained on the Intel Xeon E5-2660 v4 system.
+All results shown in this section have been obtained on the Intel Xeon E5-2660 v4 system, measurements are done with `perf`
+
+### gcc with fastmath vs. fasthmath + nofinitemath
+
+The image below shows profiling of the reaction rate calculation with `gcc 10.3` and `O3+fastmath`. About 38% of the total runtime is spent on calling `__ieee754_exp_fma`. Additionally, special versions of other functions (`log10_finite` and `exp_finite`) appear as well.
+
+**Figure 1: `gcc 10.3` and `O3+fastmath`
+![pic](https://github.com/g3bk47/CanteraCompilerPerformance/blob/main/gcc_fastmath.png?raw=true)
+
+The next image shows the profiling with `gcc 10.3` and `O3+fastmath+nofinitemath`. In addition to the calls to `__ieee754_exp_fma`, 12% of the runtime are spent on calling `__GI___exp`, which seems to be a version of `exp` with additional error handling.
+
+**Figure 2: `gcc 10.3` and `O3+fastmath+nofinitemath`
+![pic](https://github.com/g3bk47/CanteraCompilerPerformance/blob/main/gcc_nofinitemath.png?raw=true)
+
+### Intel vs. gcc
