@@ -359,4 +359,4 @@ From my tests above, the current defaults of Cantera seem to be the optimal comp
 
 Since `fastmath` **without** `no-finite-math-only` can significantly improve the performance of `g++` for simple cases like the evaluation of reaction rates, it would be nice for Cantera to be compatible with this option, e.g. for users coupling Cantera to other CFD codes, which means the internal use of NaNs and Infs would have to be removed.
 
-For new performance measurements on different hardware and more detailed profiling analysis, see https://github.com/g3bk47/CanteraCompilerPerformance/main/NewSystems.md.
+For new performance measurements on different hardware and more detailed profiling analysis, see https://github.com/g3bk47/CanteraCompilerPerformance/blob/main/NewSystems.md.
